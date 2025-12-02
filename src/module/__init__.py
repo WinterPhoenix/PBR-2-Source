@@ -12,7 +12,7 @@ def try_load_arg_file(args, arg):
 def init():
 	from .core.io.qtio import QtIOBackend
 	from .core.io.image import Image
-	from . import gui
+	from . import gui, cli
 	
 	from logging import DEBUG, basicConfig, FileHandler, root
 	basicConfig(level=DEBUG)
@@ -24,6 +24,7 @@ def init():
 	parser.add_argument('--config', help='Uses the specified app config path instead of the installation config path.', metavar="CONFIG_FILE")
 	parser.add_argument('--preset', help='Load a specific json preset.', metavar="PRESET_FILE")
 	parser.add_argument('--export-vmt', help='Sets VMT export path, immediately exports, and closes the app (if successful).', metavar="VMT_FILE")
+	parser.add_argument('--cli', help='Run in CLI mode.', action=BooleanOptionalAction)
 	args = parser.parse_args()
 
 	if args.logfile != None:
@@ -34,5 +35,8 @@ def init():
 	for key in ["config", "preset"]:
 		try_load_arg_file(args.__dict__, key)
 
-	Image.set_backend(QtIOBackend)
-	gui.start_gui(args)
+	if args.cli:
+		cli.start_cli(args)
+	else:
+		Image.set_backend(QtIOBackend)
+		gui.start_gui(args)
