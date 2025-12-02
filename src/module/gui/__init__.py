@@ -9,7 +9,7 @@ from .style import STYLESHEET_TILE_REQUIRED, STYLESHEET, STYLESHEET_MIN
 from .backend import CoreBackend, ImageRole
 
 from typing import Any
-from sys import platform
+from sys import platform, exit
 from traceback import format_exc
 from datetime import datetime
 
@@ -192,7 +192,7 @@ class MainWindow( QMainWindow ):
 
 	cache: AppCache
 
-	def __init__(self, config: AppConfig, parent=None) -> None:
+	def __init__(self, config: AppConfig, args=None, parent=None) -> None:
 		#region init
 		super().__init__(parent)
 
@@ -406,6 +406,16 @@ class MainWindow( QMainWindow ):
 		self.setMinimumSize(self.sizeHint())
 		self.resize(600, 450)
 
+		# Load initial preset if specified
+		if args.preset != None:
+			log.info("Attempting to load preset: " + args.preset)
+			self.load_preset(path=args.preset)
+
+		# Immediately export to path specified, then close the app
+		if args.export_vmt != None:
+			self.set_target(args.export_vmt)
+			self.export(closeAfterExportSuccess=True)
+
 	def setWindowTitle(self, _title: str|None=None):
 		base_title = 'PBR-2-Source v'+__version__
 		if self.watching: base_title += ' (Watching)'
@@ -417,6 +427,17 @@ class MainWindow( QMainWindow ):
 	# 	img = self.backend.set_image(str(path) if path else None, kind)
 	# 	self.reset_watch()
 	# 	set_icon(img)
+
+	def set_target(self, targetPath):
+		if len(targetPath):
+			self.cache.lastTargetPath = targetPath
+			self.target = targetPath
+			self.backend.pick_vmt(targetPath)
+
+		if self.target:
+			self.revealButton.setDisabled(False)
+
+		self.setWindowTitle()
 
 	def pick_target(self, reset=False):
 		if reset:
@@ -441,20 +462,12 @@ class MainWindow( QMainWindow ):
 
 		targetPath, _ = QFileDialog.getSaveFileName(self, caption='Saving material...', filter='Valve Material (*.vmt)', dir=str(pickPath), **pickOptions)
 
-		if len(targetPath):
-			self.cache.lastTargetPath = targetPath
-			self.target = targetPath
-			self.backend.pick_vmt(targetPath)
-
-		if self.target:
-			self.revealButton.setDisabled(False)
-
-		self.setWindowTitle()
+		self.set_target(targetPath)
 
 	#region Exporting
 
 	@Slot()
-	def export(self, *, noCache=True):
+	def export(self, *, noCache=True, closeAfterExportSuccess=False):
 		if self.exporting: return
 		self.exporting = True
 
@@ -490,6 +503,9 @@ class MainWindow( QMainWindow ):
 			if self.config.hijackMode:
 				self.backend.send_engine_command(f'mat_reloadmaterial {self.backend.name}')
 	
+			if closeAfterExportSuccess:
+				exit()
+
 		except Exception as e:
 			self.progressBar.setValue(0)
 			self.progressBar.setFormat('')
@@ -716,7 +732,7 @@ def start_gui(args):
 	# settings = TextureSettingsWindow()
 	# settings.show()
 
-	win = MainWindow( app_config )
+	win = MainWindow( app_config, args )
 	win.show()
 
 	app.exec()
